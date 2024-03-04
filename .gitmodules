@@ -1,0 +1,3 @@
+[submodule "vendor/vector_tile_renderer"]
+	path = vendor/vector_tile_renderer
+	url = https://github.com/ignatz/dart-vector-tile-renderer.git
