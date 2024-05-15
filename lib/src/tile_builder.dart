@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart' hide Theme;
 import 'package:flutter/widgets.dart';
+// ignore: implementation_imports
 import 'package:flutter_map/src/layer/tile_layer/tile_range_calculator.dart';
+// ignore: implementation_imports
 import 'package:flutter_map/src/layer/tile_layer/tile_bounds/tile_bounds.dart';
 import 'package:flutter_map/flutter_map.dart'
     show TileCoordinates, MapCamera, MobileLayerTransformer;
