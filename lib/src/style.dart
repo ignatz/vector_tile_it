@@ -262,8 +262,8 @@ class MapboxStyle {
               }
             }();
 
-      final entryTiles = source['tiles'] as List;
-      if (entryTiles.isNotEmpty) {
+      final entryTiles = source['tiles'] as List?;
+      if (entryTiles != null && entryTiles.isNotEmpty) {
         // NOTE: If there are multiple sources (e.g. a., b., c.), just pick the first one.
         // Otherwise [NetworkEncodedTileProvider] would have to support multiple sources.
         providers[name] = EncodedTileProvider.network(
