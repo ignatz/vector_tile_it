@@ -22,7 +22,7 @@ class SpriteStyle {
   });
 
   @override
-  String toString() => 'SpriteStyle($index)';
+  String toString() => 'SpriteStyle(${index.spriteByName.keys})';
 }
 
 class Style {
@@ -42,8 +42,19 @@ class Style {
     this.sprites,
   });
 
+  List<String>? _sources;
+  List<String> get sources {
+    return _sources ??= () {
+      final s = theme.layers.map((l) => l.tileSource).toSet();
+      return s.whereType<String>().toList();
+    }();
+  }
+
   @override
-  String toString() => 'Style(name=$name, ${tileProviderBySource.keys})';
+  String toString() {
+    final providers = tileProviderBySource.entries.map((entry) => (entry.key, entry.value.template)).toList();
+    return 'Style(name=$name, tileProviders=$providers, sprites=$sprites)';
+  }
 }
 
 class SpriteUri {

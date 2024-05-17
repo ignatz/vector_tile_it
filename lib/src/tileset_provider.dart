@@ -73,29 +73,12 @@ class TilesetProvider {
   }
 
   Future<Tileset> _build(TileCoordinates c, Future<void> cancelLoading) async {
-    const sourceId = 'composite';
     bool canceled = false;
     cancelLoading.whenComplete(() => canceled = true);
 
     try {
-      final tileBytes = await () async {
-        final filename = 'cached_tile_${sourceId}_${c.x}_${c.y}_${c.z}.blob';
-        final cacheBytes = await _fsCache?.read(filename);
-        if (cacheBytes != null) {
-          return cacheBytes;
-        }
-
-        final tileProvider = style.tileProviderBySource[sourceId]!;
-        final downloadedBytes = await tileProvider.provide(c);
-
-        if (_fsCache != null) {
-          Future(() async {
-            await _fsCache.write(filename, downloadedBytes);
-          }).ignore();
-        }
-
-        return downloadedBytes;
-      }();
+      final sourceId = style.sources.isEmpty ? 'composite' : style.sources[0];
+      final tileBytes = await _getTileBytes(sourceId, c);
       if (canceled) throw Error.tileLoadingCancelled;
 
       final vectorTile = VectorTileReader().read(tileBytes);
@@ -113,13 +96,35 @@ class TilesetProvider {
       // NOTE: Preprocess is intended to remove expensive stuff.
       final tileset = TilesetPreprocessor(style.theme)
           .preprocess(Tileset({sourceId: tile}), zoom: c.z.toDouble());
-      //final tileset = Tileset({sourceId: tile});
 
       return tileset;
     } catch (err) {
       _cache.remove(c);
       rethrow;
     }
+  }
+
+  Future<Uint8List> _getTileBytes(String sourceId, TileCoordinates c) async {
+    String filename() => 'cached_tile_${sourceId}_${c.x}_${c.y}_${c.z}.blob';
+    final cacheBytes = await _fsCache?.read(filename());
+    if (cacheBytes != null) {
+      return cacheBytes;
+    }
+
+    final tileProvider = style.tileProviderBySource[sourceId];
+    if (tileProvider == null) {
+      throw Exception(
+          'Missing TileProvider for: $sourceId (${style.tileProviderBySource.keys})');
+    }
+    final downloadedBytes = await tileProvider.provide(c);
+
+    if (_fsCache != null) {
+      Future(() async {
+        await _fsCache.write(filename(), downloadedBytes);
+      }).ignore();
+    }
+
+    return downloadedBytes;
   }
 }
 
@@ -190,6 +195,7 @@ abstract class EncodedTileProvider {
   int get minZoom;
 
   TileType get type;
+  String? get template => null;
 
   static EncodedTileProvider network({
     required TileType type,
@@ -218,6 +224,9 @@ class _EncodedTileNetworkProvider extends EncodedTileProvider {
 
   @override
   final int minZoom;
+
+  @override
+  String? get template => urlTemplate;
 
   /// [urlTemplate], e.g. `'https://tiles.stadiamaps.com/data/openmaptiles/{z}/{x}/{y}.pbf?api_key=<prefilled>'`
   _EncodedTileNetworkProvider({
