@@ -52,8 +52,8 @@ class SpriteUri {
 
   SpriteUri({required this.base, required this.suffix});
 
-  Uri get json => base.replace(path: '${base.path}/sprite$suffix.json');
-  Uri get image => base.replace(path: '${base.path}/sprite$suffix.png');
+  Uri get json => base.replace(path: '${base.path}$suffix.json');
+  Uri get image => base.replace(path: '${base.path}$suffix.png');
 
   @override
   String toString() => 'SpriteUri($json, $image)';
@@ -98,23 +98,36 @@ List<SpriteUri> _decodeMapboxSpriteUri(
 ) {
   const suffixes = ['@2x', ''];
   final parsed = Uri.parse(spriteUri);
-  if (parsed.scheme != 'mapbox') {
-    return suffixes.map((s) => SpriteUri(suffix: s, base: parsed)).toList();
+  if (parsed.scheme == 'mapbox') {
+    final Map<String, String> parameters = {
+      'secure': '',
+      if (apiKey != null) 'access_token': apiKey,
+    };
+
+    // https://docs.mapbox.com/style-spec/reference/sprite/
+    return suffixes
+        .map((s) => SpriteUri(
+              suffix: s,
+              base: Uri.https('api.mapbox.com',
+                  'styles/v1${parsed.path}/sprite', parameters),
+            ))
+        .toList();
   }
 
-  final Map<String, String> parameters = {
-    'secure': '',
-    if (apiKey != null) 'access_token': apiKey,
-  };
+  if (parsed.host.endsWith('maptiler.com')) {
+    final Map<String, String> parameters = {
+      if (apiKey != null) 'key': apiKey,
+    };
 
-  // https://docs.mapbox.com/style-spec/reference/sprite/
-  return suffixes
-      .map((s) => SpriteUri(
-            suffix: s,
-            base: Uri.https(
-                'api.mapbox.com', 'styles/v1${parsed.path}', parameters),
-          ))
-      .toList();
+    return suffixes
+        .map((s) => SpriteUri(
+              suffix: s,
+              base: parsed.replace(queryParameters: parameters),
+            ))
+        .toList();
+  }
+
+  return suffixes.map((s) => SpriteUri(suffix: s, base: parsed)).toList();
 }
 
 Future<Style> fetchAndDecodeMapboxStyle(
@@ -122,6 +135,7 @@ Future<Style> fetchAndDecodeMapboxStyle(
   String? apiKey,
 }) async {
   final json = await _getHttpString(_decodeMapboxUri(uri, apiKey));
+
   return await MapboxStyle.toStyle(
     uri.toString(),
     apiKey,
@@ -244,11 +258,9 @@ class MapboxStyle {
       }
       final type = TileType.values[index];
 
-      final sourceUrl = values['url'];
-      final Map<String, dynamic> source = sourceUrl == null
-          ? values
-          : await () async {
-              final uri = _decodeMapboxSourceUri(sourceUrl, apiKey);
+      final Map<String, dynamic> source = values.containsKey('url')
+          ? await () async {
+              final uri = _decodeMapboxSourceUri(values['url'], apiKey);
               final resp = await get(uri);
               if (resp.statusCode != 200) {
                 throw Exception('Http status ${resp.statusCode}: ${resp.body}');
@@ -260,7 +272,8 @@ class MapboxStyle {
                 _logger.warning('Could not parse $uri: $err');
                 rethrow;
               }
-            }();
+            }()
+          : values;
 
       final entryTiles = source['tiles'] as List?;
       if (entryTiles != null && entryTiles.isNotEmpty) {
